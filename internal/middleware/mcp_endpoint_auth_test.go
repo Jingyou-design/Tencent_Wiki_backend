@@ -39,15 +39,34 @@ func newMCPAuthTestEngine(svc *fakeMCPEndpointService, capture *map[string]any) 
 		scope, _ := types.TenantAPIKeyScopeFromContext(ctx)
 		tenantID, _ := types.TenantIDFromContext(ctx)
 		principal, _ := types.PrincipalFromContext(ctx)
+		userID, _ := types.UserIDFromContext(ctx)
 		*capture = map[string]any{
 			"endpoint":  ep,
 			"scope":     scope,
 			"tenant":    tenantID,
 			"principal": principal,
+			"user_id":   userID,
 		}
 		c.Status(http.StatusNoContent)
 	})
 	return r
+}
+
+func TestMCPEndpointAuthUsesBoundUserIdentity(t *testing.T) {
+	ep := &types.MCPEndpoint{
+		ID: "ep-1", TenantID: 42, OwnerUserID: "user-1", Enabled: true,
+		Tools: types.StringArray{types.MCPEndpointToolAsk},
+	}
+	var captured map[string]any
+	r := newMCPAuthTestEngine(&fakeMCPEndpointService{ep: ep, token: "mcp_secret"}, &captured)
+	req := httptest.NewRequest(http.MethodPost, "/mcp/ep-1", nil)
+	req.Header.Set("Authorization", "Bearer mcp_secret")
+	r.ServeHTTP(httptest.NewRecorder(), req)
+
+	principal := captured["principal"].(types.Principal)
+	if principal.Type != types.PrincipalWebUser || principal.ID != "user-1" || captured["user_id"] != "user-1" {
+		t.Fatalf("bound identity missing from context: %+v", captured)
+	}
 }
 
 func TestMCPEndpointAuthAttachesScopeAndPrincipal(t *testing.T) {

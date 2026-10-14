@@ -36,6 +36,8 @@ func askTool() mcp.Tool {
 		mcp.WithArray("knowledge_base_ids", mcp.WithStringItems(),
 			mcp.Description("Optional knowledge base ids or names to retrieve from; defaults to the "+
 				"endpoint scope or the agent's own configuration")),
+		mcp.WithBoolean("web_search_enabled",
+			mcp.Description("Enable the configured agent's web search tools for this request (default false)")),
 		// Not read-only: it creates a session and messages, and the configured
 		// agent may run its own tools. Clients must not auto-approve it.
 		mcp.WithReadOnlyHintAnnotation(false),
@@ -83,7 +85,7 @@ func (s *Server) handleAsk(ctx context.Context, req mcp.CallToolRequest) (*mcp.C
 		return mcp.NewToolResultError(err.Error()), nil
 	}
 
-	answer, refs, err := s.runQA(ctx, session, agent, question, kbIDs)
+	answer, refs, err := s.runQA(ctx, session, agent, question, kbIDs, req.GetBool("web_search_enabled", false))
 	if err != nil {
 		return mcp.NewToolResultErrorFromErr("failed to answer", err), nil
 	}
@@ -181,7 +183,7 @@ func (s *Server) resolveAskKnowledgeBases(
 func (s *Server) resolveAskSession(
 	ctx context.Context, ep *types.MCPEndpoint, sessionID, question string,
 ) (*types.Session, error) {
-	ownerID := types.MCPEndpointPrincipal(ep.TenantID, ep.ID).StorageID()
+	ownerID := ep.SessionOwnerID()
 	if sessionID = strings.TrimSpace(sessionID); sessionID != "" {
 		session, err := s.sessionService.GetSessionByID(ctx, ep.TenantID, sessionID)
 		if err != nil || session == nil || session.UserID != ownerID {
@@ -212,6 +214,7 @@ func (s *Server) resolveAskSession(
 // the references it cited. It mirrors the IM channel's non-streaming path.
 func (s *Server) runQA(
 	ctx context.Context, session *types.Session, agent *types.CustomAgent, question string, kbIDs []string,
+	webSearchEnabled bool,
 ) (string, []askReference, error) {
 	ctx, cancel := context.WithTimeout(ctx, askTimeout)
 	defer cancel()
@@ -325,10 +328,7 @@ func (s *Server) runQA(
 			UserMessageID:      userMsg.ID,
 			CustomAgent:        agent,
 			KnowledgeBaseIDs:   kbIDs,
-			// Web search is never enabled from the MCP surface: the builtin
-			// quick-answer agent turns it on by default, which would make an
-			// otherwise read-only endpoint reach the public internet.
-			WebSearchEnabled: false,
+			WebSearchEnabled:   webSearchEnabled,
 		}
 		var runErr error
 		if useAgent {

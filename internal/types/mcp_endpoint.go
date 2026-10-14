@@ -21,6 +21,7 @@ import (
 type MCPEndpoint struct {
 	ID          string `json:"id"          gorm:"type:varchar(36);primaryKey"`
 	TenantID    uint64 `json:"tenant_id"   gorm:"not null;index:idx_mcp_endpoints_tenant"`
+	OwnerUserID string `json:"owner_user_id,omitempty" gorm:"type:varchar(36);not null;default:''"`
 	Name        string `json:"name"        gorm:"type:varchar(255);not null;default:''"`
 	Description string `json:"description" gorm:"type:text;not null;default:''"`
 	Enabled     bool   `json:"enabled"     gorm:"not null;default:true"`
@@ -50,6 +51,25 @@ type MCPEndpoint struct {
 
 // TableName returns the storage table.
 func (MCPEndpoint) TableName() string { return "mcp_endpoints" }
+
+// SessionOwnerID returns the human owner when this endpoint is user-bound,
+// otherwise preserving endpoint-scoped isolation for general MCP clients.
+func (e *MCPEndpoint) SessionOwnerID() string {
+	if e == nil {
+		return ""
+	}
+	if ownerID := strings.TrimSpace(e.OwnerUserID); ownerID != "" {
+		return ownerID
+	}
+	return MCPEndpointPrincipal(e.TenantID, e.ID).StorageID()
+}
+
+func (e *MCPEndpoint) SessionPrincipal() Principal {
+	if ownerID := strings.TrimSpace(e.OwnerUserID); ownerID != "" {
+		return Principal{Type: PrincipalWebUser, ID: ownerID}
+	}
+	return MCPEndpointPrincipal(e.TenantID, e.ID)
+}
 
 // DefaultMCPEndpointRateLimitPerMinute bounds tool calls per endpoint per
 // minute when the row does not say otherwise.

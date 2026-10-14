@@ -20,6 +20,7 @@ type MCPEndpointRepository interface {
 // MCPEndpointUpdate carries the optional fields of an endpoint update. Nil
 // means "leave unchanged" so a partial PUT does not reset a field.
 type MCPEndpointUpdate struct {
+	OwnerUserID        *string
 	Name               *string
 	Description        *string
 	Enabled            *bool

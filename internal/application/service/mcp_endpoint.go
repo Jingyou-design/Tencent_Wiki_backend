@@ -41,6 +41,7 @@ type mcpEndpointService struct {
 	kbService      interfaces.KnowledgeBaseService
 	kbShareService interfaces.KBShareService
 	agentService   interfaces.CustomAgentService
+	memberService  interfaces.TenantMemberService
 }
 
 // NewMCPEndpointService creates the workspace MCP endpoint service.
@@ -49,13 +50,33 @@ func NewMCPEndpointService(
 	kbService interfaces.KnowledgeBaseService,
 	kbShareService interfaces.KBShareService,
 	agentService interfaces.CustomAgentService,
+	memberService interfaces.TenantMemberService,
 ) interfaces.MCPEndpointService {
 	return &mcpEndpointService{
 		repo:           repo,
 		kbService:      kbService,
 		kbShareService: kbShareService,
 		agentService:   agentService,
+		memberService:  memberService,
 	}
+}
+
+func (s *mcpEndpointService) validateOwner(ctx context.Context, tenantID uint64, userID string) (string, error) {
+	userID = strings.TrimSpace(userID)
+	if userID == "" {
+		return "", apperrors.NewBadRequestError("owner_user_id is required")
+	}
+	if s.memberService == nil {
+		return "", errors.New("tenant member service unavailable")
+	}
+	membership, err := s.memberService.GetMembership(ctx, userID, tenantID)
+	if err != nil {
+		return "", err
+	}
+	if membership == nil || membership.Status != types.TenantMemberStatusActive {
+		return "", apperrors.NewNotFoundError("endpoint owner is not a workspace member")
+	}
+	return userID, nil
 }
 
 func generateMCPEndpointToken() (string, error) {
@@ -108,12 +129,20 @@ func (s *mcpEndpointService) Create(
 	if err != nil {
 		return nil, "", err
 	}
+	ownerID := ""
+	if strings.TrimSpace(ep.OwnerUserID) != "" {
+		ownerID, err = s.validateOwner(ctx, tenantID, ep.OwnerUserID)
+		if err != nil {
+			return nil, "", err
+		}
+	}
 	token, err := generateMCPEndpointToken()
 	if err != nil {
 		return nil, "", err
 	}
 	row := &types.MCPEndpoint{
 		TenantID:           tenantID,
+		OwnerUserID:        ownerID,
 		Name:               name,
 		Description:        strings.TrimSpace(ep.Description),
 		Enabled:            ep.Enabled,
@@ -147,6 +176,16 @@ func (s *mcpEndpointService) Update(
 	ep, err := s.getOwned(ctx, tenantID, id)
 	if err != nil {
 		return nil, err
+	}
+	if upd.OwnerUserID != nil {
+		ownerID, err := s.validateOwner(ctx, tenantID, *upd.OwnerUserID)
+		if err != nil {
+			return nil, err
+		}
+		if ep.OwnerUserID != "" && ep.OwnerUserID != ownerID {
+			return nil, apperrors.NewBadRequestError("endpoint owner cannot be changed")
+		}
+		ep.OwnerUserID = ownerID
 	}
 	if upd.Name != nil {
 		name := strings.TrimSpace(*upd.Name)

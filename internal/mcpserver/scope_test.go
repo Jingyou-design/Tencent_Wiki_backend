@@ -273,6 +273,9 @@ func TestAskToolHasNoAgentParameter(t *testing.T) {
 	if _, ok := tool.InputSchema.Properties["agent_id"]; ok {
 		t.Fatal("ask must not let clients pick an agent")
 	}
+	if _, ok := tool.InputSchema.Properties["web_search_enabled"]; !ok {
+		t.Fatal("ask must expose the opt-in web search switch")
+	}
 	if tool.Annotations.ReadOnlyHint != nil && *tool.Annotations.ReadOnlyHint {
 		t.Fatal("ask must not advertise itself as read-only")
 	}

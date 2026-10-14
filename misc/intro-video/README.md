@@ -38,7 +38,7 @@ ffmpeg -i weknora-intro.mp4 -c:v libx264 -preset slow -crf 24 -pix_fmt yuv420p -
 | `agent` | 30.6–44.4 | Memory, knowledge search, MCP tool call, SLA table |
 | `skill` | 44–60.4 | Toolbox skills, then sandbox terminal and the generated .docx |
 | `browser` | 60–74.6 | BrowserSkill driving Chrome: release lookup and form fill |
-| `wiki` | 74.2–89 | Documents become a wiki tree and page, then a knowledge graph |
+| `routers.py` | 74.2–89 | Documents become a wiki tree and page, then a knowledge graph |
 | `eco` | 88.6–100.4 | Data sources, channels and model providers |
 | `outro` | 100–112 | Docker Compose quick start, logo and links |
 

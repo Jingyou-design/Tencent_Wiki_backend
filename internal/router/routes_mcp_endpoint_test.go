@@ -17,7 +17,7 @@ func TestMCPEndpointRoutesDeclareValidAPIKeyPolicies(t *testing.T) {
 	engine := gin.New()
 	v1 := engine.Group("/api/v1")
 	g := &rbacGuards{}
-	RegisterMCPEndpointRoutes(v1, handler.NewMCPEndpointHandler(nil), g)
+	RegisterMCPEndpointRoutes(v1, handler.NewMCPEndpointHandler(nil, nil, nil), g)
 	g.assertAPIKeyPoliciesMatchRoutes(engine)
 
 	routes := map[string]bool{}
@@ -31,6 +31,11 @@ func TestMCPEndpointRoutesDeclareValidAPIKeyPolicies(t *testing.T) {
 		"PUT /api/v1/mcp-endpoints/:endpoint_id",
 		"DELETE /api/v1/mcp-endpoints/:endpoint_id",
 		"POST /api/v1/mcp-endpoints/:endpoint_id/rotate-token",
+		"GET /api/v1/mcp-endpoints/:endpoint_id/sessions",
+		"GET /api/v1/mcp-endpoints/:endpoint_id/sessions/:session_id",
+		"GET /api/v1/mcp-endpoints/:endpoint_id/sessions/:session_id/messages",
+		"PUT /api/v1/mcp-endpoints/:endpoint_id/sessions/:session_id",
+		"DELETE /api/v1/mcp-endpoints/:endpoint_id/sessions/:session_id",
 	} {
 		if !routes[want] {
 			t.Errorf("route %s not registered", want)
@@ -63,7 +68,7 @@ func TestMCPServerRoutesAreMountedAndReported(t *testing.T) {
 	}
 
 	params := RouterParams{
-		MCPEndpointHandler: handler.NewMCPEndpointHandler(nil),
+		MCPEndpointHandler: handler.NewMCPEndpointHandler(nil, nil, nil),
 		MCPEndpointService: &stubMCPEndpointServiceForRoutes{},
 		MCPServer:          srv,
 	}

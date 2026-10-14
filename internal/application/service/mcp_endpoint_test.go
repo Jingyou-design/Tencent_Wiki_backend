@@ -68,6 +68,20 @@ func newMCPEndpointServiceForTest(repo *stubMCPEndpointRepo, agent *types.Custom
 	}
 }
 
+type stubMCPEndpointMembers struct {
+	interfaces.TenantMemberService
+	member *types.TenantMember
+}
+
+func (s *stubMCPEndpointMembers) GetMembership(
+	_ context.Context, userID string, tenantID uint64,
+) (*types.TenantMember, error) {
+	if s.member != nil && s.member.UserID == userID && s.member.TenantID == tenantID {
+		return s.member, nil
+	}
+	return nil, nil
+}
+
 func TestMCPEndpointCreateIssuesHashedToken(t *testing.T) {
 	repo := newStubMCPEndpointRepo()
 	svc := newMCPEndpointServiceForTest(repo, nil)
@@ -110,6 +124,33 @@ func TestMCPEndpointCreateIssuesHashedToken(t *testing.T) {
 	_, err = svc.Authenticate(context.Background(), ep.ID, "sk-not-an-endpoint-token")
 	if !errors.Is(err, ErrMCPEndpointTokenInvalid) {
 		t.Fatalf("foreign token prefix must be rejected, got %v", err)
+	}
+}
+
+func TestMCPEndpointOwnerMustBeWorkspaceMember(t *testing.T) {
+	svc := newMCPEndpointServiceForTest(newStubMCPEndpointRepo(), nil)
+	svc.memberService = &stubMCPEndpointMembers{member: &types.TenantMember{
+		UserID: "user-1", TenantID: 7, Status: types.TenantMemberStatusActive,
+	}}
+
+	ep, _, err := svc.Create(context.Background(), 7, &types.MCPEndpoint{
+		Name: "Demo", OwnerUserID: "user-1", Enabled: true, Tools: types.StringArray{"ask"},
+	})
+	if err != nil || ep.OwnerUserID != "user-1" {
+		t.Fatalf("create owner-bound endpoint: ep=%+v err=%v", ep, err)
+	}
+	if _, _, err := svc.Create(context.Background(), 7, &types.MCPEndpoint{
+		Name: "Other", OwnerUserID: "other", Enabled: true, Tools: types.StringArray{"ask"},
+	}); err == nil {
+		t.Fatal("non-member owner must be rejected")
+	}
+	svc.memberService = &stubMCPEndpointMembers{member: &types.TenantMember{
+		UserID: "user-2", TenantID: 7, Status: types.TenantMemberStatusSuspended,
+	}}
+	if _, _, err := svc.Create(context.Background(), 7, &types.MCPEndpoint{
+		Name: "Suspended", OwnerUserID: "user-2", Enabled: true, Tools: types.StringArray{"ask"},
+	}); err == nil {
+		t.Fatal("suspended owner must be rejected")
 	}
 }
 

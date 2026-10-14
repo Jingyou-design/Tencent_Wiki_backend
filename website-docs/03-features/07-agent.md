@@ -477,7 +477,7 @@ var ToolCapabilityRequirements = map[string]ToolRequirement{
 }
 ```
 
-能力枚举为 `vector` / `keyword` / `wiki` / `graph` / `faq`。由此派生：
+能力枚举为 `vector` / `keyword` / `routers.py` / `graph` / `faq`。由此派生：
 
 - `DeriveKBFilterForAgent(agentMode, allowedTools)`：Agent 编辑器/`@` 菜单里可选 KB 的过滤谓词；`quick-answer` 模式隐式要求 `vector|keyword`；
 - `KBSatisfiesToolRequirements`：后端最后防线——绕过前端的客户端也无法把不兼容 KB 塞给工具；

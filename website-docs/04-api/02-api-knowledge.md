@@ -18,7 +18,7 @@
 | --- | --- | --- | --- |
 | `name` | string | 是 | 名称 |
 | `description` | string | 否 | 描述 |
-| `type` | string | 否 | `document`（默认）/`faq`/`wiki` |
+| `type` | string | 否 | `document`（默认）/`faq`/`routers.py` |
 | `embedding_model_id` | string | 否 | Embedding 模型 ID |
 | `chunking_config` | object | 否 | 分块配置（chunk_size/overlap/separators/strategy…） |
 | `image_processing_config` | object | 否 | 图片属性观察配置：`model_id` / `image_attrs_enabled` / `image_actions`（`{ ocr: { on: [...], on_unobserved: bool } }`） |

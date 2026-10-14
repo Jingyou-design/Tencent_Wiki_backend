@@ -222,7 +222,7 @@ info, err := s.task.Enqueue(task)
 | `QueueMultimodal` | `multimodal` | 图片 OCR / VLM Caption |
 | `QueueQuestion` | `question` | 问题生成 |
 | `QueueGraph` | `graph` | 图谱抽取 |
-| `QueueWiki` | `wiki` | Wiki 生成与收尾 |
+| `QueueWiki` | `routers.py` | Wiki 生成与收尾 |
 | `QueueMaintenance` | `low` | 维护类任务（FAQ 批量导入、知识库复制/删除、批量删除/重解析、移动等） |
 
 另有 `sync`（数据源同步）与 `memory`（个人记忆抽取）队列。默认并发数（`internal/types/task.go`）：核心池 `DefaultCoreWorkerConcurrency = 8`、后处理池 `2`、富化池 `12`、维护池 `4`、弹性共享池 `6`、Wiki 池 `8`，完整拓扑见[异步任务系统](05-async-tasks.md#_4-1-六个独立-worker-pool)。

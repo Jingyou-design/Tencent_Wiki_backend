@@ -58,8 +58,14 @@ func MCPEndpointAuth(svc interfaces.MCPEndpointService, tenantSvc interfaces.Ten
 		}
 
 		scope := types.MCPEndpointScope(ep)
+		userID := fmt.Sprintf("mcp-%s", ep.ID)
+		principal := types.MCPEndpointPrincipal(ep.TenantID, ep.ID)
+		if ep.OwnerUserID != "" {
+			userID = ep.OwnerUserID
+			principal = ep.SessionPrincipal()
+		}
 		user := &types.User{
-			ID:       fmt.Sprintf("mcp-%s", ep.ID),
+			ID:       userID,
 			Username: fmt.Sprintf("mcp-%s", ep.ID),
 			Email:    fmt.Sprintf("mcp-%s@mcp.local", ep.ID),
 			TenantID: ep.TenantID,
@@ -67,7 +73,7 @@ func MCPEndpointAuth(svc interfaces.MCPEndpointService, tenantSvc interfaces.Ten
 		}
 		applyAuthSession(c, authSession{
 			User:        user,
-			Principal:   types.MCPEndpointPrincipal(ep.TenantID, ep.ID),
+			Principal:   principal,
 			TenantID:    ep.TenantID,
 			Tenant:      tenant,
 			Role:        types.TenantRoleViewer,

@@ -43,7 +43,8 @@ func TestSummarizeReferencesPreservesImagesOutsideExcerpt(t *testing.T) {
 
 type imageAskSessionService struct {
 	interfaces.SessionService
-	refs []*types.SearchResult
+	refs    []*types.SearchResult
+	request *types.QARequest
 }
 
 func (s *imageAskSessionService) CreateSession(_ context.Context, session *types.Session) (*types.Session, error) {
@@ -55,7 +56,8 @@ func (s *imageAskSessionService) SetSessionOwnerID(context.Context, uint64, stri
 	return nil
 }
 
-func (s *imageAskSessionService) KnowledgeQA(ctx context.Context, _ *types.QARequest, bus *event.EventBus) error {
+func (s *imageAskSessionService) KnowledgeQA(ctx context.Context, request *types.QARequest, bus *event.EventBus) error {
+	s.request = request
 	if err := bus.EmitAndWait(ctx, event.Event{
 		Type: event.EventAgentReferences, Data: event.AgentReferencesData{References: s.refs},
 	}); err != nil {
@@ -83,18 +85,20 @@ func TestAskExposesImageHandlesToTextAndStructuredClients(t *testing.T) {
 		URL: f.ref, Caption: "chart", OCRText: "values", OriginalURL: "private-parser-locator",
 	}, {URL: publicURL}})
 	require.NoError(t, err)
-	f.srv.sessionService = &imageAskSessionService{refs: []*types.SearchResult{{
+	sessionService := &imageAskSessionService{refs: []*types.SearchResult{{
 		ID: "chunk", KnowledgeID: "doc-1", Content: strings.Repeat("long text ", 100), ImageInfo: string(info),
 	}}}
+	f.srv.sessionService = sessionService
 	f.srv.messageService = &imageAskMessageService{}
 	f.srv.agentService = &stubAgentService{agents: map[string]*types.CustomAgent{
 		types.BuiltinQuickAnswerID: {ID: types.BuiltinQuickAnswerID, IsBuiltin: true},
 	}}
 	result, err := f.srv.handleAsk(f.ctx, mcp.CallToolRequest{Params: mcp.CallToolParams{
-		Arguments: map[string]any{"question": "Explain the diagram"},
+		Arguments: map[string]any{"question": "Explain the diagram", "web_search_enabled": true},
 	}})
 	require.NoError(t, err)
 	require.False(t, result.IsError, "%#v", result.Content)
+	require.True(t, sessionService.request.WebSearchEnabled)
 	require.Contains(t, result.Content[0].(mcp.TextContent).Text, `Image: "`+f.ref+`"`)
 	require.Contains(t, result.Content[0].(mcp.TextContent).Text, `Image: "`+publicURL+`"`)
 	result = f.rewrite(result)

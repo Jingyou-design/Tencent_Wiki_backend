@@ -60,7 +60,18 @@ func (r *mcpEndpointRepository) ListByTenant(ctx context.Context, tenantID uint6
 }
 
 func (r *mcpEndpointRepository) Update(ctx context.Context, ep *types.MCPEndpoint) error {
-	return r.db.WithContext(ctx).Save(ep).Error
+	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := tx.Save(ep).Error; err != nil {
+			return err
+		}
+		if ep.OwnerUserID == "" {
+			return nil
+		}
+		legacyOwnerID := types.MCPEndpointPrincipal(ep.TenantID, ep.ID).StorageID()
+		return tx.Model(&types.Session{}).
+			Where("tenant_id = ? AND user_id = ?", ep.TenantID, legacyOwnerID).
+			Update("user_id", ep.OwnerUserID).Error
+	})
 }
 
 func (r *mcpEndpointRepository) Delete(ctx context.Context, tenantID uint64, id string) error {

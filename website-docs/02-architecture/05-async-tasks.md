@@ -66,8 +66,8 @@ opt := &asynq.RedisClientOpt{
 | `knowledge:list_delete` | `TypeKnowledgeListDelete` | 批量删除知识 | `low` |
 | `knowledge:list_reparse` | `TypeKnowledgeListReparse` | 批量重解析 | `low` |
 | `knowledge:move` | `TypeKnowledgeMove` | 知识移动 | `low` |
-| `wiki:ingest` | `TypeWikiIngest` | Wiki 页面生成/同步 | `wiki` |
-| `wiki:finalize` | `TypeWikiFinalize` | Wiki KB 级收尾（防抖：索引重建/死链清理/交叉链接） | `wiki` |
+| `wiki:ingest` | `TypeWikiIngest` | Wiki 页面生成/同步 | `routers.py` |
+| `wiki:finalize` | `TypeWikiFinalize` | Wiki KB 级收尾（防抖：索引重建/死链清理/交叉链接） | `routers.py` |
 
 所有 payload 结构体（如 `DocumentProcessPayload`、`ImageMultimodalPayload`）都内嵌 `types.TracingContext`，用于跨进程传递 Langfuse/W3C traceparent（见可观测性文档），并统一携带 `tenant_id` / `knowledge_id` / `knowledge_base_id` 等路由字段，供死信归档与取消匹配使用。
 
@@ -90,12 +90,12 @@ opt := &asynq.RedisClientOpt{
 | `enrichment` | 12 | `summary`(2)、`multimodal`(1)、`graph`(1)、`question`(1)、`memory`(1) | `asynq.enrichment_concurrency` / `WEKNORA_ASYNQ_ENRICHMENT_CONCURRENCY` |
 | `maintenance` | 4 | `sync`(2)、`low`(1) | `asynq.maintenance_concurrency` / `WEKNORA_ASYNQ_MAINTENANCE_CONCURRENCY` |
 | `shared`（弹性层） | 6 | core + enrichment 中 `SharedWeight > 0` 的队列 | `asynq.shared_concurrency` / `WEKNORA_ASYNQ_SHARED_CONCURRENCY` |
-| `wiki` | 8 | `wiki`(1) | `asynq.wiki_concurrency` / `WEKNORA_WIKI_ASYNQ_CONCURRENCY` |
+| `routers.py` | 8 | `routers.py`(1) | `asynq.wiki_concurrency` / `WEKNORA_WIKI_ASYNQ_CONCURRENCY` |
 
 设计要点（源码注释均可佐证）：
 
 - **保障容量 + 弹性借用**：core/postprocess/enrichment/maintenance 提供最低保障容量；`shared` pool 同时订阅 core 与 enrichment 的队列，闲置容量可被任一阶段借用（`NewSharedAsynqServer`：Redis dequeue 原子，多 server 订阅同一队列每个任务仍只执行一次）。post-process 和 maintenance 不参与 shared pool：前者需要独立保障延迟，后者执行时间较长，可能占用交互任务的突发容量。范围由 `QueueWeightsForSharedPool` 定义。
-- **Wiki 硬隔离**：`wiki` pool 只拉取 `wiki` 队列，防止解析流水线与 Wiki 生成互相饿死（`NewWikiAsynqServer` 注释）。
+- **Wiki 硬隔离**：`routers.py` pool 只拉取 `routers.py` 队列，防止解析流水线与 Wiki 生成互相饿死（`NewWikiAsynqServer` 注释）。
 - **聊天附件优先**：`chat_attachment` 在 core pool 权重 3 高于 `default` 的 1，大批量 KB 导入不会让交互式聊天上传排队。
 - **滚动升级兼容**：`QueueMaintenance` 常量的物理 Redis 队列名保持旧版的 `"low"`，旧版本入队的任务在滚动部署期间仍可被消费。
 
