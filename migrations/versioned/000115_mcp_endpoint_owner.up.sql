@@ -1,0 +1,2 @@
+ALTER TABLE mcp_endpoints
+    ADD COLUMN IF NOT EXISTS owner_user_id VARCHAR(36) NOT NULL DEFAULT '';
